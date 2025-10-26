@@ -1,8 +1,11 @@
 import express from "express";
 import db from "@repo/db/client";
+import cors from "cors";
 const app = express();
 
 app.use(express.json())
+
+app.use(cors());
 
 app.post("/hdfcWebhook", async (req, res) => {
     //TODO: Add zod validation here?
@@ -17,6 +20,20 @@ app.post("/hdfcWebhook", async (req, res) => {
         amount: req.body.amount
     };
 
+    // check the onramp transactions is already in the process or not 
+    const onRampTransactionIsInProcess = await db.onRampTransaction.findFirst({
+        where : {
+            token : paymentInformation.token,
+        }
+    })
+    if(onRampTransactionIsInProcess){
+        if(onRampTransactionIsInProcess.status === "Success" || onRampTransactionIsInProcess.status === "Failure"){
+            return res.status(411).json({
+                message : "the token with the transaction is already successed or failed",
+                success : false
+            })
+        }
+    }
     try {
         await db.$transaction([
             db.balance.updateMany({
